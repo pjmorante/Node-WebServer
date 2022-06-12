@@ -1,30 +1,61 @@
 const { response } = require('express');
+const bcrypt = require('bcrypt');
 
-const getUsers = (req, res = response) => {
-  res.status(200).json({ msg: 'get API' });
+const { Usuario } = require('../models/usuario.modelo')
+
+const getUsers = async(req, res = response) => {
+
+  const { limite = 5, desde = 0 } = req.query;
+  const query = { estado: true };
+
+  const [ total, usuarios ] = await Promise.all([
+    Usuario.countDocuments(query),
+    Usuario.find(query).skip(Number(desde)).limit(Number(limite)),
+  ]);
+
+  res.json({ total, usuarios });
 };
 
-const updateUser = (req, res = response) => {
+const updateUser = async(req, res = response) => {
 
   const { id } = req.params;
-  res.status(200).json({ 
-    msg: 'put API',
-    id  
-  });
+  const { _id, password, google, email,...resto } = req.body;
+
+  if(password){
+    const salt = bcrypt.genSaltSync(10);
+    resto.password = bcrypt.hashSync(password, salt);
+  }
+
+  const usuario = await Usuario.findByIdAndUpdate(id, resto);
+
+  res.json(usuario);
 };
 
-const createUser = (req, res = response) => {
+const createUser = async(req, res = response) => {
 
-  const { name, age } = req.body;
+  const { nombre, email, password, rol } = req.body;
+  const usuario = new Usuario({ nombre, email, password, rol });  
+  
+  const salt = bcrypt.genSaltSync(10);
+  usuario.password = bcrypt.hashSync(password, salt);
+
+  await usuario.save();
+
   res.status(201).json({ 
-    msg: 'post API',
-    name,
-    age
+    usuario
  });
 };
 
-const deleteUser = (req, res = response) => {
-  res.json({ msg: 'delete API' });
+const deleteUser = async(req, res = response) => {
+  
+  const { id } = req.params;
+  //Borrado fisicamente de la DB
+  //const usuario = await Usuario.findByIdAndDelete(id);
+  
+  const usuario = await Usuario.findByIdAndUpdate(id, { estado: false })
+  
+  
+  res.json({ usuario });
 };
 
 module.exports = {
